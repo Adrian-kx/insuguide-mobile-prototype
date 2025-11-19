@@ -1,0 +1,9 @@
+ter acesso de usuario (login e senha) ; em .json
+ter cadastro de paciente em .json
+ter para adicionar creatina
+ter historico em .json
+opção de novo medidaa de glicose
+search
+tudo em json
+fazer arredondamento sempre em um numero par
+sempre arredondadno apra o numero par mais proximo

@@ -1,6 +1,7 @@
+// lib/screens/patient_register.dart
 import 'package:flutter/material.dart';
-import '../models/patient.dart';
-import 'classification_noncritical.dart';
+import '../services/patient_service.dart';
+import '../widgets/ui.dart';
 
 class PatientRegisterScreen extends StatefulWidget {
   const PatientRegisterScreen({super.key});
@@ -10,122 +11,132 @@ class PatientRegisterScreen extends StatefulWidget {
 }
 
 class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
+  // controllers devem ficar dentro do State (não no topo do arquivo)
+  final nameCtrl = TextEditingController();
+  final ageCtrl = TextEditingController();
+  final notesCtrl = TextEditingController();
 
-  String name = '';
-  String gender = 'Masculino';
-  int? age;
-  double? weight;
-  double? height;
-  String ward = '';
+  final genderCtrl = ValueNotifier<String>('Masculino');
+  final weightCtrl = TextEditingController();
+  final heightCtrl = TextEditingController();
+  final wardCtrl = TextEditingController();
 
-  double? _parseDouble(String v) =>
-      double.tryParse(v.replaceAll(',', '.').trim());
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    ageCtrl.dispose();
+    notesCtrl.dispose();
+    weightCtrl.dispose();
+    heightCtrl.dispose();
+    wardCtrl.dispose();
+    genderCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final n = nameCtrl.text.trim();
+    final a = int.tryParse(ageCtrl.text.trim()) ?? -1;
+
+    if (n.isEmpty || a <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nome e idade válidos são obrigatórios')),
+      );
+      return;
+    }
+
+    final weight =
+        double.tryParse(weightCtrl.text.trim().replaceAll(',', '.'));
+    final height =
+        double.tryParse(heightCtrl.text.trim().replaceAll(',', '.'));
+    final notes =
+        notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim();
+
+    // cria paciente (com os campos básicos)
+    final p = await PatientService.create(name: n, age: a, notes: notes);
+
+    // persiste os extras (sexo, peso, altura, leito)
+    final all = await PatientService.all();
+    final idx = all.indexWhere((e) => e.id == p.id);
+    if (idx >= 0) {
+      all[idx]
+        ..gender = genderCtrl.value
+        ..weightKg = weight
+        ..heightCm = height
+        ..ward = wardCtrl.text.trim();
+      await PatientService.saveAll(all);
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cadastro de Paciente')),
-      body: Padding(
+      appBar: AppBar(title: const Text('Novo Paciente')),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                decoration:
-                    const InputDecoration(labelText: 'Nome do paciente'),
-                onChanged: (v) => name = v.trim(),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null,
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: gender,
-                decoration: const InputDecoration(labelText: 'Sexo'),
-                items: const ['Masculino', 'Feminino']
-                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                    .toList(),
-                onChanged: (v) => setState(() => gender = v ?? 'Masculino'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Idade'),
-                keyboardType: TextInputType.number,
-                onChanged: (v) => age = int.tryParse(v.trim()),
-                // opcional: se preencher, precisa ser válido
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return null;
-                  final parsed = int.tryParse(v.trim());
-                  if (parsed == null || parsed < 0) return 'Idade inválida';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Peso (kg)'),
-                keyboardType: TextInputType.number,
-                onChanged: (v) => weight = _parseDouble(v),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return null;
-                  final parsed = _parseDouble(v);
-                  if (parsed == null || parsed <= 0) return 'Peso inválido';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                decoration: const InputDecoration(labelText: 'Altura (cm)'),
-                keyboardType: TextInputType.number,
-                onChanged: (v) => height = _parseDouble(v),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return null;
-                  final parsed = _parseDouble(v);
-                  if (parsed == null || parsed <= 0) return 'Altura inválida';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                decoration:
-                    const InputDecoration(labelText: 'Local de internação'),
-                onChanged: (v) => ward = v.trim(),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    final patient = Patient(
-                      id: DateTime.now()
-                          .millisecondsSinceEpoch
-                          .toString(), // id simples
-                      name: name,
-                      gender: gender,
-                      age: age,
-                      weightKg: weight,
-                      heightCm: height,
-                      ward: ward,
-                    );
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Paciente cadastrado com sucesso!'),
-                      ),
-                    );
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ClassificationNonCriticalScreen(patient: patient),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Salvar Cadastro'),
-              ),
-            ],
-          ),
+        child: Column(
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'Nome'),
+              controller: nameCtrl,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Idade'),
+              controller: ageCtrl,
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            ValueListenableBuilder<String>(
+              valueListenable: genderCtrl,
+              builder: (context, value, _) {
+                return DropdownButtonFormField<String>(
+                  value: value,
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'Masculino', child: Text('Masculino')),
+                    DropdownMenuItem(
+                        value: 'Feminino', child: Text('Feminino')),
+                    DropdownMenuItem(
+                        value: 'Indefinido', child: Text('Indefinido')),
+                  ],
+                  onChanged: (v) => genderCtrl.value = v ?? 'Indefinido',
+                  decoration: const InputDecoration(labelText: 'Sexo'),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Peso (kg)'),
+              controller: weightCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Altura (cm)'),
+              controller: heightCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(labelText: 'Setor/Leito'),
+              controller: wardCtrl,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration:
+                  const InputDecoration(labelText: 'Observações'),
+              controller: notesCtrl,
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            PrimaryButton(text: 'Salvar', onPressed: _save),
+          ],
         ),
       ),
     );

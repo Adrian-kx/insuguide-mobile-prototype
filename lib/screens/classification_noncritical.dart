@@ -42,6 +42,7 @@ class ClassificationNonCriticalScreen extends StatelessWidget {
                     Text('Paciente: ${patient.name}', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Text('Sexo: ${patient.gender}'),
+                    // ignore: unnecessary_null_comparison
                     if (patient.age != null) Text('Idade: ${patient.age} anos'),
                     if (patient.weightKg != null) Text('Peso: ${patient.weightKg} kg'),
                     if (patient.heightCm != null) Text('Altura: ${patient.heightCm} cm'),
